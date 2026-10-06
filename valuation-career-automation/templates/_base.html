@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin:0; padding:0; background:#f3f4f6; font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif; color:#1f2937; }
+  .wrap { max-width:680px; margin:0 auto; background:#ffffff; }
+  .head { background:#1f2a44; color:#ffffff; padding:22px 28px; }
+  .head h1 { margin:0; font-size:20px; letter-spacing:-0.3px; }
+  .head .date { margin-top:4px; font-size:13px; color:#aab4cc; }
+  .body { padding:8px 28px 28px; }
+  h2 { font-size:15px; color:#1f2a44; border-bottom:2px solid #1f2a44; padding-bottom:6px; margin:28px 0 14px; }
+  .card { border:1px solid #e5e7eb; border-radius:6px; padding:14px 16px; margin-bottom:12px; }
+  .card h3 { margin:0 0 6px; font-size:15px; line-height:1.4; }
+  .card h3 a { color:#1f2a44; text-decoration:none; }
+  .meta { font-size:12px; color:#6b7280; margin-bottom:8px; }
+  .tag { display:inline-block; background:#eef2ff; color:#3730a3; font-size:11px; padding:2px 7px; border-radius:10px; margin-right:4px; }
+  .star { color:#b45309; font-size:12px; margin-left:6px; }
+  p { margin:6px 0; font-size:14px; line-height:1.65; }
+  .label { font-weight:700; color:#374151; }
+  .quiz { background:#f9fafb; border-left:3px solid #1f2a44; padding:10px 14px; margin-bottom:10px; }
+  .answer { background:#f0fdf4; border-left:3px solid #15803d; padding:10px 14px; margin-bottom:10px; }
+  .footer { padding:16px 28px; font-size:11px; color:#9ca3af; border-top:1px solid #e5e7eb; }
+  ul { margin:6px 0; padding-left:20px; font-size:14px; line-height:1.65; }
+  a { color:#1d4ed8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>{% block title %}{% endblock %}</h1>
+    <div class="date">{{ date }}</div>
+  </div>
+  <div class="body">
+    {% block content %}{% endblock %}
+  </div>
+  <div class="footer">
+    Valuation Career Automation · AI가 수집·요약·질문 생성을 돕고, 최종 판단과 검증은 직접 합니다.
+    원문 출처를 반드시 확인하세요.
+  </div>
+</div>
+</body>
+</html>

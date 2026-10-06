@@ -1,0 +1,31 @@
+name: Valuation Interview Review
+
+on:
+  schedule:
+    # KST 일요일 09:00 = UTC 일요일 00:00
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python main.py review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_INTELLIGENCE_DB_ID: ${{ secrets.NOTION_INTELLIGENCE_DB_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}

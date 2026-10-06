@@ -1,0 +1,69 @@
+{% extends "_base.html" %}
+{% block title %}오늘의 Valuation Brief{% endblock %}
+{% block content %}
+
+{% macro topics(a) %}{% for t in a.valuation_topics %}<span class="tag">{{ t }}</span>{% endfor %}{% endmacro %}
+
+<h2>1. 오늘의 M&amp;A / Valuation 기사 {{ news|length }}개</h2>
+{% for a in news %}
+<div class="card">
+  <h3><a href="{{ a.source_url }}">{{ a.title }}</a><span class="star">{{ a.importance|stars }}</span></h3>
+  <div class="meta">{{ a.company or '' }}{% if a.publisher %} · {{ a.publisher }}{% endif %}</div>
+  <div>{{ topics(a) }}</div>
+  <p>{{ a.summary }}</p>
+  <p><span class="label">왜 Valuation에서 중요한가</span><br>{{ a.why_valuation_matters }}</p>
+  <p><span class="label">Valuation Impact</span><br>{{ a.valuation_impact }}</p>
+</div>
+{% else %}
+<p>오늘 선정된 기사가 없습니다.</p>
+{% endfor %}
+
+{% if disclosures %}
+<h2>2. 오늘의 공시 → Valuation Point</h2>
+{% for a in disclosures %}
+<div class="card">
+  <h3><a href="{{ a.source_url }}">{{ a.title }}</a><span class="star">{{ a.importance|stars }}</span></h3>
+  <div>{{ topics(a) }}</div>
+  <p>{{ a.summary }}</p>
+  <p><span class="label">Valuation Impact (재무영향 → 변수 → 기업가치 → 추가 확인사항)</span><br>{{ a.valuation_impact }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>3. 오늘 공부할 개념</h2>
+<ul>
+{% for a in analyses %}
+  <li>{{ a.study_point }} <span class="meta">— {{ a.company or a.title }}</span></li>
+{% endfor %}
+</ul>
+
+<h2>4. 오늘의 Valuation Quiz {{ quizzes|length }}문제</h2>
+{% for a in quizzes %}
+<div class="quiz"><p><span class="label">Q{{ loop.index }}.</span> {{ a.quiz_question }}</p></div>
+{% endfor %}
+
+<h2>5. Quiz 정답 / 해설</h2>
+<p class="meta">먼저 스스로 답을 적어본 뒤 확인하세요.</p>
+{% for a in quizzes %}
+<div class="answer"><p><span class="label">A{{ loop.index }}.</span> {{ a.quiz_answer }}</p></div>
+{% endfor %}
+
+<h2>6. 오늘의 면접 소재</h2>
+{% for a in interviews %}
+<div class="card">
+  <h3>{{ a.title }}</h3>
+  <p><span class="label">예상 질문</span><br>{{ a.interview_question }}</p>
+  <p><span class="label">답변 소재</span><br>{{ a.interview_material }}</p>
+</div>
+{% else %}
+<p>오늘은 면접 소재로 분류된 항목이 없습니다.</p>
+{% endfor %}
+
+<h2>7. 원문 Source</h2>
+<ul>
+{% for a in analyses %}
+  <li><a href="{{ a.source_url }}">{{ a.title }}</a>{% if a.publisher %} <span class="meta">({{ a.publisher }})</span>{% endif %}</li>
+{% endfor %}
+</ul>
+
+{% endblock %}

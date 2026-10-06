@@ -1,0 +1,39 @@
+name: Valuation Big4 Weekly
+
+on:
+  schedule:
+    # KST 금요일 08:00 = UTC 목요일 23:00
+    - cron: "0 23 * * 4"
+  workflow_dispatch:
+
+jobs:
+  big4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore processed.db
+        uses: actions/cache@v4
+        with:
+          path: data/processed.db
+          key: processed-db-${{ github.run_id }}
+          restore-keys: processed-db-
+
+      - run: python main.py big4
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_INTELLIGENCE_DB_ID: ${{ secrets.NOTION_INTELLIGENCE_DB_ID }}
+          NOTION_INTERVIEW_DB_ID: ${{ secrets.NOTION_INTERVIEW_DB_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}

@@ -1,0 +1,42 @@
+name: Valuation Daily Brief
+
+on:
+  schedule:
+    # GitHub cron은 UTC 기준. KST = UTC+9
+    # KST 월~금 08:00 = UTC 일~목 23:00 → "0 23 * * 0-4"
+    - cron: "0 23 * * 0-4"
+  workflow_dispatch:
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # 중복 제거용 SQLite를 실행 간에 유지한다. (매 실행마다 새 key로 저장, 가장 최근 것을 복원)
+      - name: Restore processed.db
+        uses: actions/cache@v4
+        with:
+          path: data/processed.db
+          key: processed-db-${{ github.run_id }}
+          restore-keys: processed-db-
+
+      - run: python main.py daily
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_INTELLIGENCE_DB_ID: ${{ secrets.NOTION_INTELLIGENCE_DB_ID }}
+          NOTION_INTERVIEW_DB_ID: ${{ secrets.NOTION_INTERVIEW_DB_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}

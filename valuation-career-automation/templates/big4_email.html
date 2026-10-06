@@ -1,0 +1,24 @@
+{% extends "_base.html" %}
+{% block title %}Big4 Weekly — Valuation 리서치{% endblock %}
+{% block content %}
+
+<h2>이번 주 Big4 자료 {{ items|length }}건</h2>
+{% for a in items %}
+<div class="card">
+  <h3><a href="{{ a.source_url }}">{{ a.title }}</a><span class="star">{{ a.importance|stars }}</span></h3>
+  <div class="meta">{{ a.company or '' }}{% if a.publisher %} · {{ a.publisher }}{% endif %}</div>
+  <div>{% for t in a.valuation_topics %}<span class="tag">{{ t }}</span>{% endfor %}</div>
+  <p><span class="label">핵심 내용</span><br>{{ a.summary }}</p>
+  <p><span class="label">왜 Valuation 실무에서 중요한가</span><br>{{ a.why_valuation_matters }}</p>
+  <p><span class="label">공부할 개념</span><br>{{ a.study_point }}</p>
+  <p><span class="label">가치평가 업무혁신 직무와의 연결</span><br>{{ a.job_connection }}</p>
+  <p><span class="label">ValuFlow에 적용할 아이디어</span><br>{{ a.valuflow_idea }}</p>
+  {% if a.interview_worthy %}
+  <p><span class="label">면접 소재</span><br>Q. {{ a.interview_question }}<br>{{ a.interview_material }}</p>
+  {% endif %}
+</div>
+{% else %}
+<p>이번 주 새로 선정된 Big4 자료가 없습니다.</p>
+{% endfor %}
+
+{% endblock %}

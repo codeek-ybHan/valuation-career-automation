@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Weekly Interview Review{% endblock %}
+{% block content %}
+
+<h2>1. 이번 주 기억해야 할 Deal TOP 3</h2>
+{% for d in r.top_deals %}
+<div class="card"><h3>{{ loop.index }}. {{ d.deal }}</h3><p>{{ d.why_remember }}</p></div>
+{% endfor %}
+
+<h2>2. 이번 주 Valuation 핵심 개념 5개</h2>
+<ul>{% for c in r.key_concepts %}<li><b>{{ c.concept }}</b> — {{ c.explanation }}</li>{% endfor %}</ul>
+
+<h2>3. 다시 공부해야 할 개념</h2>
+<ul>{% for c in r.review_concepts %}<li><b>{{ c.concept }}</b> — {{ c.explanation }}</li>{% else %}<li>없음</li>{% endfor %}</ul>
+
+<h2>4. 면접 활용 사례 TOP 3</h2>
+{% for c in r.interview_cases %}
+<div class="card"><h3>{{ loop.index }}. {{ c.case }}</h3><p>{{ c.how_to_use }}</p></div>
+{% endfor %}
+
+<h2>5. 예상 면접 질문 5개</h2>
+{% for q in r.expected_questions %}
+<div class="quiz"><p><span class="label">Q{{ loop.index }}.</span> {{ q }}</p></div>
+{% endfor %}
+
+{% endblock %}
