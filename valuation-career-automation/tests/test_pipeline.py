@@ -47,7 +47,7 @@ def test_parse_rss_filters_old_and_strips_publisher():
 
 def test_score_prefers_korean_and_keywords():
     assert score_title("삼성 M&A 인수") > score_title("weather today")
-    assert score_title("Big acquisition deal") > 0
+    assert score_title("삼성 M&A 인수", "한국경제") > score_title("삼성 M&A 인수")
 
 
 # ---- dart ----

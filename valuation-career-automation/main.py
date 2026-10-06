@@ -3,7 +3,7 @@
     python main.py daily   [--dry-run]   # 평일 아침: 뉴스+공시 Daily Brief
     python main.py big4    [--dry-run]   # 금요일: Big4 Weekly
     python main.py review  [--dry-run]   # 일요일: Weekly Interview Review
-    python main.py sample  [--dry-run]   # 기획서 27장 테스트 (Schneider/PTC 샘플 1건)
+    python main.py sample  [--dry-run]   # 샘플 테스트 (SK하이닉스 신규시설투자 1건)
 
 --dry-run : Notion 저장과 Gmail 발송, 처리 이력 기록은 하지 않고 output/에 HTML만 저장한다.
 
@@ -200,15 +200,15 @@ def run_weekly_review(dry_run: bool = False) -> None:
 
 
 SAMPLE = SourceItem(
-    title="Schneider Electric이 PTC를 인수",
-    url="https://example.com/sample/schneider-ptc",
+    title="SK하이닉스, 용인 반도체 클러스터 대규모 신규시설투자 결정",
+    url="https://example.com/sample/skhynix-capex",
     kind="news",
     publisher="SAMPLE",
     content=(
-        "제목: Schneider Electric이 PTC를 인수\n"
-        "관련 내용: 글로벌 전력·자동화 기업 Schneider Electric이 산업용 소프트웨어(CAD/PLM) 기업 PTC를 "
-        "인수하는 방안을 추진한다. 인수 대가는 PTC의 직전 주가 대비 프리미엄을 얹은 수준이며, 일부는 "
-        "차입으로 조달할 예정이다. (※ 테스트용 샘플 자료)"
+        "제목: SK하이닉스, 용인 반도체 클러스터 대규모 신규시설투자 결정\n"
+        "관련 내용: SK하이닉스가 HBM 등 차세대 메모리 생산능력 확대를 위해 신규 팹에 "
+        "수조 원 규모의 시설투자를 결정했다. 투자는 수년에 걸쳐 집행되며 일부는 차입으로 조달할 "
+        "예정이다. (※ 테스트용 샘플 자료)"
     ),
 )
 

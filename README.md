@@ -67,7 +67,7 @@ cp .env.example .env        # 값 채우기
 pytest                      # 단위 테스트 (외부 API 불필요)
 
 # 단계별로 확인 (필요한 키만 있으면 됨)
-python main.py sample --dry-run   # OPENAI_API_KEY만 필요. Schneider/PTC 샘플 분석 → output/sample_*.html
+python main.py sample --dry-run   # OPENAI_API_KEY만 필요. SK하이닉스 신규시설투자 샘플 분석 → output/sample_*.html
 python main.py daily  --dry-run   # + 뉴스 수집 실제 호출. Notion/Gmail/이력 기록 없음
 python main.py sample             # Notion + Gmail까지 실제 연동 테스트
 python main.py daily              # 운영 실행

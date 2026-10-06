@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 TOPICS = ('(valuation OR deals OR "M&A" OR PPA OR impairment OR "fair value" '
           'OR transaction OR "corporate finance" OR AI OR analytics OR automation)')
+KO_TOPICS = '(가치평가 OR M&A OR 딜 OR 공정가치 OR PPA OR 손상 OR 기업금융 OR AI OR 업무혁신)'
 
 # 채용 공고는 리서치 자료가 아니므로 제외 (예: "Deals Manager in CA-Silicon Valley")
 JOB_POSTING = re.compile(
@@ -23,24 +24,29 @@ JOB_POSTING = re.compile(
     re.I,
 )
 
+# 국내 법인 자료(한글) 우선. 글로벌(영문) 자료는 국내 자료가 부족할 때만 보충한다.
 FIRMS: dict[str, list[tuple[str, str]]] = {
-    # 법인명: [(쿼리, 언어), ...]
-    "PwC": [
-        (f"(site:pwc.com OR site:samil.com) {TOPICS}", "en"),
-        ('삼일PwC (가치평가 OR M&A OR 딜 OR 공정가치)', "ko"),
+    "삼일PwC": [
+        (f"(site:samil.com OR site:pwc.com/kr) {KO_TOPICS}", "ko"),
+        (f"삼일PwC {KO_TOPICS}", "ko"),
     ],
-    "KPMG": [
-        (f"site:kpmg.com {TOPICS}", "en"),
-        ('삼정KPMG (가치평가 OR M&A OR 딜 OR 공정가치)', "ko"),
+    "삼정KPMG": [
+        (f"(site:kpmg.com/kr OR site:home.kpmg/kr) {KO_TOPICS}", "ko"),
+        (f"삼정KPMG {KO_TOPICS}", "ko"),
     ],
-    "Deloitte": [
-        (f"site:deloitte.com {TOPICS}", "en"),
-        ('딜로이트 안진 (가치평가 OR M&A OR 딜 OR 공정가치)', "ko"),
+    "딜로이트안진": [
+        (f"site:deloitte.com/kr {KO_TOPICS}", "ko"),
+        (f"딜로이트 안진 {KO_TOPICS}", "ko"),
     ],
-    "EY": [
-        (f"site:ey.com {TOPICS}", "en"),
-        ('EY한영 (가치평가 OR M&A OR 딜 OR 공정가치)', "ko"),
+    "EY한영": [
+        (f"site:ey.com/ko_kr {KO_TOPICS}", "ko"),
+        (f"EY한영 {KO_TOPICS}", "ko"),
     ],
+}
+
+# 글로벌 보충용 (국내 자료가 부족할 때만 사용, 기획서 19장: 글로벌 10% 이하)
+GLOBAL_FIRMS: dict[str, tuple[str, str]] = {
+    "PwC Global": (f"site:pwc.com {TOPICS}", "en"),
 }
 
 
@@ -70,4 +76,20 @@ def collect_big4(lookback_days: int = 7, limit: int = 5) -> list[SourceItem]:
             if len(items) > depth and len(picked) < limit:
                 picked.append(items[depth])
         depth += 1
+
+    # 국내 자료가 부족할 때만 글로벌 자료로 보충 (최대 limit의 10%, 최소 1건)
+    if len(picked) < limit:
+        quota = min(limit - len(picked), max(1, limit // 10))
+        for firm, (query, lang) in GLOBAL_FIRMS.items():
+            try:
+                extra = [i for i in fetch_google_news(f"{query} when:{lookback_days}d",
+                                                       kind="big4", lookback=lookback, lang=lang)
+                         if not JOB_POSTING.search(i.title)]
+            except Exception as e:
+                log.error("Global Big4 fetch failed (%s): %s", firm, e)
+                continue
+            for item in sorted(extra, key=lambda i: i.score, reverse=True)[:quota]:
+                item.content = f"법인: {firm} (글로벌 참고자료)\n" + item.content
+                picked.append(item)
+            break
     return picked
