@@ -48,7 +48,7 @@
 핵심 설계 결정
 - **Structured Output**: `response_format=<Pydantic>`로 스키마를 강제 → 문자열 파싱 없음. `valuation_topics`/`importance`는 `Literal`이라 허용값 밖의 값이 나올 수 없음.
 - **출처는 LLM이 아니라 코드가 붙임**: `source_url`은 `SourceItem`에서 복사 (환각 방지).
-- **분석 성공 시에만 '처리됨' 기록**: LLM이 실패한 항목은 다음 실행에서 자동 재시도.
+- **분석 성공 후 전달 큐와 함께 원자적으로 '처리됨' 기록**: LLM이 실패한 항목은 다음 실행에서 자동 재시도.
 - **단계 격리**: 수집/분석/Notion/Gmail 각각 try/except. Gmail이 실패해도 Notion 저장은 유지되고, 메일 HTML은 `output/`에 항상 남음.
 - **의존성 최소화**: Notion·Gmail은 SDK 대신 `requests`로 REST 직접 호출 (쓰는 엔드포인트가 2~3개뿐).
 
@@ -60,6 +60,7 @@ requests · pydantic · jinja2 · SQLite · GitHub Actions
 ## 실행 방법
 
 ```bash
+cd valuation-career-automation
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env        # 값 채우기
@@ -75,7 +76,7 @@ python main.py big4               # Big4 Weekly
 python main.py review             # Weekly Interview Review
 ```
 
-설정이 없는 서비스(Notion/Gmail/DART)는 경고만 남기고 건너뜁니다. 그래서 키를 하나씩 추가하며 단계적으로 검증할 수 있습니다.
+DART 미설정은 공시 수집을 건너뜁니다. 실제 daily/big4 실행에는 Notion 또는 Gmail 설정이 필요하며, 키 없이 분석 흐름을 점검할 때는 `--dry-run`을 사용합니다. 그래서 키를 하나씩 추가하며 단계적으로 검증할 수 있습니다.
 
 권장 순서: ① `sample --dry-run` → ② Notion 연결 후 `sample` → ③ Gmail 연결 후 `sample` → ④ `daily --dry-run` → ⑤ `daily` → ⑥ DART 키 추가 → ⑦ Actions 등록
 
@@ -134,10 +135,10 @@ Notion에서 DB 2개를 만들고, 해당 Integration을 각 DB에 **Connections
 
 ## GitHub Actions 설정
 
-1. 이 폴더를 GitHub 저장소 루트로 push
+1. workflow는 저장소 루트 `.github/workflows/`에, Python 프로젝트는 `valuation-career-automation/`에 둡니다. CI는 외부 API 없이 테스트만 실행합니다.
 2. Settings → Secrets and variables → Actions에 아래 Secrets 등록
    `OPENAI_API_KEY` `DART_API_KEY` `NOTION_TOKEN` `NOTION_INTELLIGENCE_DB_ID` `NOTION_INTERVIEW_DB_ID` `GOOGLE_CLIENT_ID` `GOOGLE_CLIENT_SECRET` `GOOGLE_REFRESH_TOKEN` `EMAIL_TO`
-3. Actions 탭에서 각 workflow를 `Run workflow`로 수동 실행해 확인
+3. 실제 저장·발송은 기본적으로 꺼져 있습니다. Actions에서 수동 실행할 때 `deliver`를 체크하거나, 예약 발송을 원할 때만 Repository Variable `ENABLE_SCHEDULED_DELIVERY=true`를 설정합니다. 테스트 CI에는 서비스 키가 필요 없습니다.
 
 | Workflow | KST | cron (UTC) |
 |---|---|---|
@@ -165,3 +166,12 @@ Notion에서 DB 2개를 만들고, 해당 Integration을 각 DB에 **Connections
 - 퀴즈 풀이 결과(정답률)를 Notion에 기록해 약한 개념 자동 추적
 - 처리 이력 DB를 외부 저장소(Notion/Supabase 등)로 이전
 - 다른 스케줄러로 확장: `python main.py <command>` 한 줄이라 cron / Render Cron / Cloud Run Job에 그대로 사용 가능
+
+## 전달 상태와 재시도
+
+- SQLite `deliveries`에 채널별 pending/sent/failed, 시도 횟수와 저장된 payload를 보존합니다. 새 자료가 없어도 실패한 단계를 먼저 재시도합니다.
+- 분석 전체/일부 실패와 전달 실패는 종료 코드 1입니다. 실제 daily/big4 실행은 분석 결과·전달 큐·중복 제거 이력을 한 트랜잭션으로 기록합니다.
+- 실패한 실행의 DB도 캐시에 저장하고 daily/big4 실행을 직렬화합니다. 캐시는 영구 저장소가 아니므로 운영 시 외부 DB로 이전해야 합니다.
+- 외부 서버가 쓰기를 수락한 직후 응답이 끊기면 재시도 때 중복이 발생할 수 있습니다. 로컬 단계 키는 성공 응답을 기록한 작업의 반복을 막지만 exactly-once 전송을 보장하지 않습니다.
+- 기존 processed_items는 그대로 유지합니다. 과거 버전에서 이미 완료 처리한 전달 실패는 payload가 없으므로 자동 복구할 수 없습니다.
+- interview review/sample은 단발 실행이며 durable delivery queue 대상은 daily/big4입니다.

@@ -5,9 +5,27 @@ on:
     # KST 일요일 09:00 = UTC 일요일 00:00
     - cron: "0 0 * * 0"
   workflow_dispatch:
+    inputs:
+      deliver:
+        description: '실제 Notion 저장 및 Gmail 발송'
+        type: boolean
+        default: false
+
+
+permissions:
+  contents: read
+
+concurrency:
+  group: valuation-delivery
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: valuation-career-automation
 
 jobs:
   review:
+    if: (github.event_name == 'schedule' && vars.ENABLE_SCHEDULED_DELIVERY == 'true') || (github.event_name == 'workflow_dispatch' && inputs.deliver)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -17,6 +35,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: valuation-career-automation/requirements.txt
 
       - run: pip install -r requirements.txt
 
