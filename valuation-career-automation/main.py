@@ -23,6 +23,7 @@ from collectors.news import collect_news
 from config import KST, Settings, get_settings
 from models.valuation import SourceItem, ValuationAnalysis
 from repositories.processed_repository import ProcessedRepository
+from repositories.delivery_repository import DeliveryRepository
 from services.gmail import GmailService, build_big4_email, build_daily_email, build_review_email
 from services.llm import LLMService
 from services.notion import NotionService
@@ -55,18 +56,23 @@ def save_to_notion(analyses: list[ValuationAnalysis], notion: NotionService | No
         log.info("Notion skipped")
         return
     saved = 0
+    failed = False
     for a in analyses:
         try:
             notion.save_intelligence(a)
             saved += 1
         except Exception as e:
-            log.error("Notion API failed (intelligence) for %s: %s", a.title, e)
+            failed = True
+            log.error("Notion intelligence delivery failed")
         if a.interview_worthy:
             try:
                 notion.save_interview(a)
             except Exception as e:
-                log.error("Notion API failed (interview bank) for %s: %s", a.title, e)
+                failed = True
+                log.error("Notion interview delivery failed")
     log.info("Saved to Notion: %d/%d", saved, len(analyses))
+    if failed:
+        raise RuntimeError("Notion delivery failed")
 
 
 def deliver_email(subject: str, html: str, settings: Settings, gmail: GmailService | None,
@@ -84,7 +90,8 @@ def deliver_email(subject: str, html: str, settings: Settings, gmail: GmailServi
         gmail.send(subject, html)
         log.info("Email sent successfully")
     except Exception as e:
-        log.error("Gmail send failed: %s", e)
+        log.error("Gmail send failed: %s", type(e).__name__)
+        raise RuntimeError("Gmail delivery failed") from None
 
 
 def _optional(factory, name: str, dry_run: bool):
@@ -103,19 +110,25 @@ def _optional(factory, name: str, dry_run: bool):
 def run_daily_brief(dry_run: bool = False) -> None:
     settings = get_settings()
     llm = LLMService(settings)
-    repo = None if dry_run else ProcessedRepository(settings.db_path)
+    repo = None if dry_run else DeliveryRepository(settings.db_path)
     dedup_repo = repo or ProcessedRepository(settings.db_path)  # dry-run도 중복 판정은 읽기 전용으로 사용
     notion = _optional(lambda: NotionService(settings), "Notion", dry_run)
     gmail = _optional(lambda: GmailService(settings), "Gmail", dry_run)
+    if not dry_run:
+        if notion is None and gmail is None:
+            raise RuntimeError("Configure Notion or Gmail, or use --dry-run")
+        repo.flush("daily", notion, gmail)
 
     # 1) 수집 — 소스 하나가 실패해도 다른 소스는 진행
+    collection_errors = []
     news: list[SourceItem] = []
     try:
         log.info("Collecting news...")
         news = collect_news(settings.news_lookback_hours)
         log.info("Found %d articles", len(news))
     except Exception as e:
-        log.error("News collection failed: %s", e)
+        collection_errors.append("news")
+        log.error("News collection failed: %s", type(e).__name__)
 
     disclosures: list[SourceItem] = []
     if settings.dart_api_key:
@@ -124,7 +137,8 @@ def run_daily_brief(dry_run: bool = False) -> None:
             disclosures = collect_dart_disclosures(settings.dart_api_key, settings.dart_lookback_days)
             log.info("Found %d disclosures", len(disclosures))
         except Exception as e:
-            log.error("DART collection failed: %s", e)
+            collection_errors.append("dart")
+            log.error("DART collection failed: %s", type(e).__name__)
     else:
         log.info("DART_API_KEY not set - skipping disclosures")
 
@@ -136,26 +150,40 @@ def run_daily_brief(dry_run: bool = False) -> None:
     log.info("Selected %d items (news %d, disclosures %d)", len(selected),
              min(len(fresh_news), settings.news_count), min(len(fresh_dart), settings.dart_count))
     if not selected:
+        if collection_errors:
+            raise RuntimeError("Collection failed: " + ", ".join(collection_errors))
         log.info("Nothing new to analyze. Done.")
         return
 
     # 3) 분석 → 4) Notion → 5) Gmail
     log.info("Running valuation analysis...")
-    analyses = analyze_items(selected, llm, repo)
+    analyses = analyze_items(selected, llm, None)
     if not analyses:
-        log.error("All analyses failed")
-        return
-    save_to_notion(analyses, notion)
+        raise RuntimeError("All analyses failed")
     subject, html = build_daily_email(analyses)
-    deliver_email(subject, html, settings, gmail, "daily")
+    # Persist the HTML without sending; the durable queue owns delivery.
+    deliver_email(subject, html, settings, None, "daily")
+    if not dry_run:
+        by_url = {item.url: item for item in selected}
+        repo.enqueue("daily", [(by_url[a.source_url], a) for a in analyses],
+                     subject, html, notion=notion is not None, gmail=gmail is not None)
+        repo.flush("daily", notion, gmail)
+    if collection_errors:
+        raise RuntimeError("Partial collection failure: " + ", ".join(collection_errors))
+    if len(analyses) != len(selected):
+        raise RuntimeError("Some analyses failed; unsuccessful items remain eligible for retry")
 
 
 def run_big4_weekly(dry_run: bool = False) -> None:
     settings = get_settings()
     llm = LLMService(settings)
-    repo = ProcessedRepository(settings.db_path)
+    repo = DeliveryRepository(settings.db_path)
     notion = _optional(lambda: NotionService(settings), "Notion", dry_run)
     gmail = _optional(lambda: GmailService(settings), "Gmail", dry_run)
+    if not dry_run:
+        if notion is None and gmail is None:
+            raise RuntimeError("Configure Notion or Gmail, or use --dry-run")
+        repo.flush("big4", notion, gmail)
 
     log.info("Collecting Big4 materials...")
     # 중복 제거 후에도 N건이 남도록 넉넉히 가져온다
@@ -166,13 +194,19 @@ def run_big4_weekly(dry_run: bool = False) -> None:
         log.info("No new Big4 material. Done.")
         return
 
-    analyses = analyze_items(fresh, llm, None if dry_run else repo)
+    analyses = analyze_items(fresh, llm, None)
     if not analyses:
-        log.error("All analyses failed")
-        return
-    save_to_notion(analyses, notion)
+        raise RuntimeError("All analyses failed")
     subject, html = build_big4_email(analyses)
-    deliver_email(subject, html, settings, gmail, "big4")
+    # Persist the HTML without sending; the durable queue owns delivery.
+    deliver_email(subject, html, settings, None, "big4")
+    if not dry_run:
+        by_url = {item.url: item for item in fresh}
+        repo.enqueue("big4", [(by_url[a.source_url], a) for a in analyses],
+                     subject, html, notion=notion is not None, gmail=gmail is not None)
+        repo.flush("big4", notion, gmail)
+    if len(analyses) != len(fresh):
+        raise RuntimeError("Some analyses failed; unsuccessful items remain eligible for retry")
 
 
 def run_weekly_review(dry_run: bool = False) -> None:

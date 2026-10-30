@@ -1,4 +1,5 @@
 """main.py 흐름 테스트: LLM/수집/Notion/Gmail을 가짜로 바꿔 '한 단계가 실패해도 계속 진행'을 검증."""
+import pytest
 import main
 from models.valuation import SourceItem, ValuationAnalysis
 from tests.test_pipeline import make_analysis
@@ -30,7 +31,8 @@ def test_daily_dry_run_skips_failed_item_and_writes_html(monkeypatch, tmp_path):
     items.insert(1, SourceItem(title="FAIL 기사", url="https://n/fail", kind="news"))
     settings = setup(monkeypatch, tmp_path, items)
 
-    main.run_daily_brief(dry_run=True)
+    with pytest.raises(RuntimeError, match="Some analyses failed"):
+        main.run_daily_brief(dry_run=True)
 
     out = list(settings.output_dir.glob("daily_*.html"))
     assert len(out) == 1
@@ -54,12 +56,19 @@ def test_gmail_failure_keeps_notion_and_html(monkeypatch, tmp_path):
     monkeypatch.setattr(main, "NotionService", FakeNotion)
     monkeypatch.setattr(main, "GmailService", BrokenGmail)
 
-    main.run_daily_brief(dry_run=False)
+    with pytest.raises(RuntimeError, match="Delivery stages failed"):
+        main.run_daily_brief(dry_run=False)
 
     assert saved == ["기사", "IB:기사"]                      # Notion은 저장됨 (면접 가치 → Bank도)
     assert list(settings.output_dir.glob("daily_*.html"))   # 메일 실패해도 HTML 보존
 
-    # 다음 실행에서는 같은 기사가 중복으로 걸러진다
+    # 다음 실행은 분석/Notion을 반복하지 않고 실패했던 Gmail만 재시도한다
     saved.clear()
+    monkeypatch.setattr(BrokenGmail, "send", lambda self, *args: None)
     main.run_daily_brief(dry_run=False)
     assert saved == []
+
+
+def test_all_analysis_failure_is_nonzero(monkeypatch, tmp_path):
+    setup(monkeypatch, tmp_path, [SourceItem(title="FAIL", url="https://n/f", kind="news")])
+    assert main.main(["daily", "--dry-run"]) == 1
